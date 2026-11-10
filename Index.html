@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+  :root { --ink:#1b2430; --muted:#6b7684; --line:#e3e7ec; --accent:#1f6feb; --bg:#f6f8fa; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--ink); }
+  .wrap { max-width:560px; margin:32px auto; padding:0 16px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:28px; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 24px; font-size:14px; }
+  label { display:block; font-size:13px; font-weight:600; margin:16px 0 6px; }
+  .opt { font-weight:400; color:var(--muted); }
+  input, select, textarea { width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:9px; font:inherit; background:#fff; }
+  input:focus, select:focus, textarea:focus { outline:2px solid var(--accent); outline-offset:-1px; border-color:transparent; }
+  .notes-picker { position:relative; }
+  .notes-picker__trigger { display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; min-height:44px; padding:11px 12px; border:1px solid var(--line); border-radius:9px; font:inherit; background:#fff; color:var(--ink); cursor:pointer; text-align:left; }
+  .notes-picker__trigger:focus-visible { outline:2px solid var(--accent); outline-offset:-1px; border-color:transparent; }
+  .notes-picker__trigger.is-placeholder { color:var(--muted); }
+  .notes-picker__display { min-width:0; flex:1; display:flex; flex-wrap:wrap; align-items:baseline; gap:0 4px; overflow-wrap:anywhere; }
+  .notes-picker__detail, .notes-picker__option-detail { color:var(--muted); font-weight:400; }
+  .notes-picker__detail { margin-left:4px; }
+  .notes-picker__arrow { flex:none; color:var(--muted); }
+  .notes-picker__list { position:absolute; z-index:20; top:calc(100% + 4px); left:0; right:0; max-height:240px; overflow-y:auto; padding:4px; border:1px solid var(--line); border-radius:9px; background:#fff; box-shadow:0 6px 18px rgba(27,36,48,.16); }
+  .notes-picker__list[hidden] { display:none; }
+  .notes-picker__option { display:flex; align-items:baseline; gap:4px; padding:9px 10px; border-radius:6px; color:var(--ink); cursor:pointer; }
+  .notes-picker__option:hover, .notes-picker__option:focus-visible { background:#eef4ff; outline:none; }
+  .notes-picker__option-main { color:var(--ink); }
+  .notes-save-row { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin-top:12px; }
+  button.notes-save { padding:9px 12px; border:1px solid var(--accent); border-radius:9px; background:#fff; color:var(--accent); font:inherit; font-weight:600; cursor:pointer; }
+  button.notes-save:disabled { opacity:.55; cursor:default; }
+  .notes-status { margin:0; }
+  .saved-notes-box { margin-top:12px; padding:14px; border:1px solid var(--line); border-radius:10px; background:#fff; }
+  .saved-notes-box h2 { margin:0; font-size:16px; }
+  .saved-notes-list { display:grid; gap:8px; margin:10px 0 0; padding:0; list-style:none; }
+  .saved-notes-item { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 10px; border:1px solid var(--line); border-radius:8px; }
+  .saved-notes-label { min-width:0; overflow-wrap:anywhere; }
+  .saved-notes-actions { display:flex; flex:none; gap:4px; }
+  .saved-notes-edit, .saved-notes-remove { padding:5px 8px; border:0; border-radius:6px; background:transparent; font:inherit; cursor:pointer; }
+  .saved-notes-edit { color:var(--accent); }
+  .saved-notes-remove { color:#c62828; }
+  .saved-notes-edit:hover { background:#eef4ff; }
+  .saved-notes-remove:hover { background:#fff1f1; }
+  .saved-notes-note { margin:10px 0 0; }
+  .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+  input[type="hidden"] { display:none; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .row label { margin-top:16px; }
+  .slots { display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:8px; min-height:20px; }
+  .slot { padding:9px 0; border:1px solid var(--line); border-radius:8px; background:#fff; cursor:pointer; font:inherit; font-size:14px; }
+  .slot:hover { border-color:var(--accent); }
+  .slot.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .hint { color:var(--muted); font-size:13px; }
+  button.submit { margin-top:24px; width:100%; padding:13px; border:0; border-radius:10px; background:var(--accent); color:#fff; font:inherit; font-weight:600; cursor:pointer; }
+  button.submit:disabled { opacity:.55; cursor:default; }
+  .err { color:#c62828; font-size:14px; margin-top:12px; }
+  .done { text-align:center; padding:20px 0; }
+  .done .check { font-size:44px; }
+  @media (max-width:600px){
+    .wrap { width:100%; max-width:560px; margin:16px auto; padding:0 12px; }
+    .card { padding:clamp(16px, 4vw, 22px); border-radius:12px; }
+    .row { grid-template-columns:1fr; gap:0; }
+    .row label { margin-top:12px; }
+    input, select, textarea { min-height:44px; padding:10px 12px; font-size:16px; }
+    .notes-picker__trigger, button.notes-save, button.submit { min-height:44px; }
+    .notes-picker__list { max-height:45vh; }
+    .saved-notes-box { padding:12px; }
+    .saved-notes-item { align-items:flex-start; gap:8px; }
+    .saved-notes-actions { flex-wrap:wrap; }
+  }
+  @media (max-width:400px){
+    .wrap { margin:12px auto; padding:0 10px; }
+    .card { padding:14px; }
+    h1 { font-size:20px; }
+    .sub { margin-bottom:16px; }
+    .saved-notes-item { flex-wrap:wrap; }
+  }
+  #service:invalid, #time:invalid { color: var(--muted); }
+  #service option, #time option { color: var(--ink); }
+</style>
+</head>
+<body>
+<div class="wrap"><div class="card" id="card">
+  <h1 id="title">Agenda tu instalacion</h1>
+  <p class="sub">Escoge que tipo de servicio necesitas y equipo necesario al terminar sera enviado por WhatsApp.</p>
+
+  <form id="f">
+    <div class="row">
+      <div><label for="name">Nombre</label><input id="name" name="name" required autocomplete="name"></div>
+      <div><label for="phone">Telefono</label><input id="phone" name="phone" type="tel" required autocomplete="tel"></div>
+    </div>
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required autocomplete="email">
+    <label for="company">Empresa o corporación <span class="opt">(optional)</span></label>
+    <input id="company" name="company" autocomplete="organization">
+
+    <div class="row">
+      <div><label for="service">Tipo de Servicio</label><select id="service" name="service" required>
+        <option value="" disabled selected hidden>Elige una opcion</option>
+        <option value="Instalacion">Instalación</option>
+        <option value="Servicio">Servicio</option>
+      </select></div>
+      <div><label for="date">Fecha solicitada</label><input id="date" name="date" type="date" required></div>
+    </div>
+
+    <label for="time">Teimpo determinado</label>
+    <select id="time" name="time" required>
+      <option value="" disabled selected hidden>Escoge una hora:</option>
+      <option value="9:00 AM">9:00 AM</option>
+      <option value="9:30 AM">9:30 AM</option>
+      <option value="10:00 AM">10:00 AM</option>
+      <option value="10:30 AM">10:30 AM</option>
+      <option value="11:00 AM">11:00 AM</option>
+      <option value="11:30 AM">11:30 AM</option>
+      <option value="12:00 PM">12:00 PM</option>
+      <option value="12:30 PM">12:30 PM</option>
+      <option value="1:00 PM">1:00 PM</option>
+    </select>
+
+    <div class="row">
+      <div>
+        <label id="notesLabel" for="notesButton">Equipo</label>
+        <div class="notes-picker" id="notesPicker" data-field="notes" data-title="Notes 1">
+          <input type="hidden" id="notes" name="notes" value="">
+          <button type="button" class="notes-picker__trigger is-placeholder" id="notesButton" aria-labelledby="notesLabel" aria-describedby="notesHelp" aria-haspopup="listbox" aria-expanded="false" aria-controls="notesListbox">
+            <span class="notes-picker__display" id="notesDisplay" aria-live="polite">Choose an item</span>
+            <span class="notes-picker__arrow" aria-hidden="true">▾</span>
+          </button>
+          <span class="sr-only" id="notesHelp">Escoge que equipo necesitas para tu servicio o instalacion.</span>
+          <div class="notes-picker__list" id="notesListbox" role="listbox" aria-labelledby="notesLabel" aria-multiselectable="false" tabindex="-1" hidden>
+            <!-- To add a choice, copy one option below. Edit data-value and the visible text. Add an option-detail span for a gray parenthetical description. -->
+            <div class="notes-picker__option" id="notesOptionCore" role="option" aria-selected="false" tabindex="-1" data-value="Core">
+              <span class="notes-picker__option-main">Core</span><span class="notes-picker__option-detail">(Tableta, Router, Printer ...)</span>
+            </div>
+            <div class="notes-picker__option" id="notesOptionModuloSas" role="option" aria-selected="false" tabindex="-1" data-value="modulo sas"><span class="notes-picker__option-main">Modulos SAS</span></div>
+            <div class="notes-picker__option" id="notesOptionModuloPulso" role="option" aria-selected="false" tabindex="-1" data-value="modulo pulso"><span class="notes-picker__option-main">Modulo Pulso</span></div>
+            <div class="notes-picker__option" id="notesOptionNovomatic" role="option" aria-selected="false" tabindex="-1" data-value="cable novo"><span class="notes-picker__option-main">Cables Novomatic</span></div>
+            <div class="notes-picker__option" id="notesOptionWin" role="option" aria-selected="false" tabindex="-1" data-value="cable win"><span class="notes-picker__option-main">Cables Win Systems/Kajot</span></div>
+            <div class="notes-picker__option" id="notesOptionAmatic" role="option" aria-selected="false" tabindex="-1" data-value="cable Amatic"><span class="notes-picker__option-main">Cables Amatic/Criollitas</span></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <label id="notes2Label" for="notes2Button">Cantidad</label>
+        <div class="notes-picker" id="notes2Picker" data-field="notes2" data-title="Notes 2">
+          <input type="hidden" id="notes2" name="notes2" value="">
+          <button type="button" class="notes-picker__trigger is-placeholder" id="notes2Button" aria-labelledby="notes2Label" aria-describedby="notes2Help" aria-haspopup="listbox" aria-expanded="false" aria-controls="notes2Listbox">
+            <span class="notes-picker__display" id="notes2Display" aria-live="polite">Choose a quantity</span>
+            <span class="notes-picker__arrow" aria-hidden="true">▾</span>
+          </button>
+          <span class="sr-only" id="notes2Help">Escoge la cantidad necesaria.</span>
+          <div class="notes-picker__list" id="notes2Listbox" role="listbox" aria-labelledby="notes2Label" aria-multiselectable="false" tabindex="-1" hidden>
+            <div class="notes-picker__option" id="notes2Option1" role="option" aria-selected="false" tabindex="-1" data-value="1"><span class="notes-picker__option-main">1</span></div>
+            <div class="notes-picker__option" id="notes2Option2" role="option" aria-selected="false" tabindex="-1" data-value="2"><span class="notes-picker__option-main">2</span></div>
+            <div class="notes-picker__option" id="notes2Option3" role="option" aria-selected="false" tabindex="-1" data-value="3"><span class="notes-picker__option-main">3</span></div>
+            <div class="notes-picker__option" id="notes2Option4" role="option" aria-selected="false" tabindex="-1" data-value="4"><span class="notes-picker__option-main">4</span></div>
+            <div class="notes-picker__option" id="notes2Option5" role="option" aria-selected="false" tabindex="-1" data-value="5"><span class="notes-picker__option-main">5</span></div>
+            <div class="notes-picker__option" id="notes2Option6" role="option" aria-selected="false" tabindex="-1" data-value="6"><span class="notes-picker__option-main">6</span></div>
+            <div class="notes-picker__option" id="notes2Option7" role="option" aria-selected="false" tabindex="-1" data-value="7"><span class="notes-picker__option-main">7</span></div>
+            <div class="notes-picker__option" id="notes2Option8" role="option" aria-selected="false" tabindex="-1" data-value="8"><span class="notes-picker__option-main">8</span></div>
+            <div class="notes-picker__option" id="notes2Option9" role="option" aria-selected="false" tabindex="-1" data-value="9"><span class="notes-picker__option-main">9</span></div>
+            <div class="notes-picker__option" id="notes2Option10" role="option" aria-selected="false" tabindex="-1" data-value="10"><span class="notes-picker__option-main">10</span></div>
+            <div class="notes-picker__option" id="notes2Option11" role="option" aria-selected="false" tabindex="-1" data-value="11"><span class="notes-picker__option-main">11</span></div>
+            <div class="notes-picker__option" id="notes2Option12" role="option" aria-selected="false" tabindex="-1" data-value="12"><span class="notes-picker__option-main">12</span></div>
+            <div class="notes-picker__option" id="notes2Option13" role="option" aria-selected="false" tabindex="-1" data-value="13"><span class="notes-picker__option-main">13</span></div>
+            <div class="notes-picker__option" id="notes2Option14" role="option" aria-selected="false" tabindex="-1" data-value="14"><span class="notes-picker__option-main">14</span></div>
+            <div class="notes-picker__option" id="notes2Option15" role="option" aria-selected="false" tabindex="-1" data-value="15"><span class="notes-picker__option-main">15</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes-save-row">
+      <button class="notes-save" id="saveNotes" type="button" disabled>Save item and quantity</button>
+      <button class="notes-save" id="cancelNotesEdit" type="button" hidden>Cancel change</button>
+      <p class="hint notes-status" id="notesStatus" role="status" aria-live="polite">Choose one item and one quantity, then save the pair.</p>
+    </div>
+    <section class="saved-notes-box" aria-labelledby="savedNotesHeading">
+      <h2 id="savedNotesHeading">Saved items and quantities</h2>
+      <p class="hint" id="savedNotesEmpty">No item and quantity pairs saved yet.</p>
+      <ul class="saved-notes-list" id="savedNotesList" aria-label="Saved item and quantity pairs"></ul>
+      <p class="hint saved-notes-note">Use Change to edit a saved pair, or Remove it and select a new item and quantity.</p>
+    </section>
+
+    <p class="hint" id="pending-note">This sends a request only; it is not a confirmed appointment. I will confirm it in WhatsApp. Review the prepared message and press Send in WhatsApp to submit your request.</p>
+    <button class="submit" id="go" type="submit">Request via WhatsApp</button>
+    <div class="err" id="err" role="alert"></div>
+  </form>
+</div></div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const WHATSAPP_NUMBER = '17879804012';
+  const pad = n => String(n).padStart(2, '0');
+  const dateInput = $('date');
+  let dateBoundaryTimer = null;
+  function localDateValue(date) {
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  }
+  function validateDateInput() {
+    if (!dateInput.value) {
+      dateInput.setCustomValidity('');
+      return false;
+    }
+    const invalid = dateInput.value < dateInput.min;
+    dateInput.setCustomValidity(invalid ? 'Choose a date starting tomorrow.' : '');
+    return !invalid;
+  }
+  function updateDateBoundary() {
+    const now = new Date();
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    dateInput.min = localDateValue(tomorrow);
+    validateDateInput();
+    window.clearTimeout(dateBoundaryTimer);
+    const delay = Math.max(1000, tomorrow.getTime() - now.getTime() + 100);
+    dateBoundaryTimer = window.setTimeout(updateDateBoundary, delay);
+  }
+  dateInput.addEventListener('input', validateDateInput);
+  dateInput.addEventListener('change', validateDateInput);
+  dateInput.addEventListener('focus', updateDateBoundary);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) updateDateBoundary();
+  });
+  updateDateBoundary();
+
+  const notesPickers = [
+    { root: $('notesPicker'), button: $('notesButton'), display: $('notesDisplay'), input: $('notes'), listbox: $('notesListbox'), field: 'notes', placeholder: 'Choose an item' },
+    { root: $('notes2Picker'), button: $('notes2Button'), display: $('notes2Display'), input: $('notes2'), listbox: $('notes2Listbox'), field: 'notes2', placeholder: 'Choose a quantity' }
+  ].map(picker => ({
+    ...picker,
+    options: Array.from(picker.listbox.querySelectorAll('[role="option"]')),
+    activeIndex: -1,
+    typeahead: '',
+    typeaheadTimer: null
+  }));
+  const itemPicker = notesPickers[0];
+  const quantityPicker = notesPickers[1];
+  const savedNotes = [];
+  const saveNotesButton = $('saveNotes');
+  const cancelNotesEditButton = $('cancelNotesEdit');
+  const notesStatus = $('notesStatus');
+  const savedNotesList = $('savedNotesList');
+  const savedNotesEmpty = $('savedNotesEmpty');
+  let editingKey = null;
+
+  function selectedOptions(picker) {
+    return picker.options.filter(option => option.getAttribute('aria-selected') === 'true');
+  }
+
+  function chosenOption(picker) {
+    return selectedOptions(picker)[0] || null;
+  }
+
+  function pairKey(itemValue, quantityValue) {
+    return JSON.stringify([itemValue, quantityValue]);
+  }
+
+  function pairFromSelections() {
+    const item = chosenOption(itemPicker);
+    const quantity = chosenOption(quantityPicker);
+    if (!item || !quantity) return null;
+    const detail = item.querySelector('.notes-picker__option-detail');
+    return {
+      key: pairKey(item.dataset.value, quantity.dataset.value),
+      itemValue: item.dataset.value,
+      label: item.querySelector('.notes-picker__option-main').textContent.trim(),
+      detail: detail ? detail.textContent.trim() : '',
+      quantityValue: quantity.dataset.value
+    };
+  }
+
+  function updateSaveButton() {
+    const candidate = pairFromSelections();
+    const editing = editingKey ? savedNotes.find(note => note.key === editingKey) : null;
+    const duplicate = candidate && savedNotes.some(note => note.key === candidate.key && note.key !== editingKey);
+    const unchanged = editing && candidate && editing.key === candidate.key;
+    saveNotesButton.textContent = editingKey ? 'Update pair' : 'Save item and quantity';
+    saveNotesButton.disabled = !candidate || Boolean(duplicate) || Boolean(unchanged);
+    cancelNotesEditButton.hidden = !editingKey;
+  }
+
+  function renderPicker(picker) {
+    const selected = chosenOption(picker);
+    picker.input.value = selected ? selected.dataset.value : '';
+    picker.display.replaceChildren();
+    if (!selected) {
+      const placeholder = document.createElement('span');
+      placeholder.textContent = picker.placeholder;
+      picker.display.appendChild(placeholder);
+      picker.button.classList.add('is-placeholder');
+    } else {
+      picker.button.classList.remove('is-placeholder');
+      const main = document.createElement('span');
+      main.className = 'notes-picker__selected-main';
+      main.textContent = selected.querySelector('.notes-picker__option-main').textContent.trim();
+      picker.display.appendChild(main);
+      const detail = selected.querySelector('.notes-picker__option-detail');
+      if (detail) {
+        const detailText = document.createElement('span');
+        detailText.className = 'notes-picker__detail';
+        detailText.textContent = detail.textContent.trim();
+        picker.display.appendChild(detailText);
+      }
+    }
+    updateSaveButton();
+  }
+
+  function renderSavedNotes() {
+    savedNotesList.replaceChildren();
+    savedNotesEmpty.hidden = savedNotes.length > 0;
+    savedNotes.forEach(note => {
+      const item = document.createElement('li');
+      item.className = 'saved-notes-item';
+      const label = document.createElement('span');
+      label.className = 'saved-notes-label';
+      const main = document.createElement('span');
+      main.className = 'notes-picker__option-main';
+      main.textContent = note.label;
+      label.appendChild(main);
+      if (note.detail) {
+        const detail = document.createElement('span');
+        detail.className = 'notes-picker__detail';
+        detail.textContent = note.detail;
+        label.appendChild(detail);
+      }
+      label.appendChild(document.createTextNode(` × ${note.quantityValue}`));
+
+      const actions = document.createElement('span');
+      actions.className = 'saved-notes-actions';
+      const change = document.createElement('button');
+      change.type = 'button';
+      change.className = 'saved-notes-edit';
+      change.textContent = 'Change';
+      change.setAttribute('aria-label', `Change ${note.label}, quantity ${note.quantityValue}`);
+      change.addEventListener('click', () => editSavedNote(note.key));
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'saved-notes-remove';
+      remove.textContent = 'Remove';
+      remove.setAttribute('aria-label', `Remove ${note.label}, quantity ${note.quantityValue}`);
+      remove.addEventListener('click', () => removeSavedNote(note.key));
+      actions.append(change, remove);
+      item.append(label, actions);
+      savedNotesList.appendChild(item);
+    });
+    updateSaveButton();
+  }
+
+  function setPickerSelection(picker, value) {
+    picker.options.forEach(option => option.setAttribute('aria-selected', String(option.dataset.value === value)));
+    renderPicker(picker);
+  }
+
+  function editSavedNote(key) {
+    const note = savedNotes.find(item => item.key === key);
+    if (!note) return;
+    editingKey = key;
+    setPickerSelection(itemPicker, note.itemValue);
+    setPickerSelection(quantityPicker, note.quantityValue);
+    updateSaveButton();
+    notesStatus.textContent = `Changing ${note.label} × ${note.quantityValue}. Choose the item and quantity, then update the pair.`;
+  }
+
+  function cancelPairEdit() {
+    editingKey = null;
+    updateSaveButton();
+    notesStatus.textContent = 'Change cancelled. Choose an item and quantity to add another pair.';
+  }
+
+  function removeSavedNote(key) {
+    const index = savedNotes.findIndex(note => note.key === key);
+    if (index < 0) return;
+    const [removed] = savedNotes.splice(index, 1);
+    if (editingKey === key) editingKey = null;
+    renderSavedNotes();
+    notesStatus.textContent = `Removed ${removed.label} × ${removed.quantityValue}. Choose an item and quantity to add it again.`;
+  }
+
+  function resetNotesDraft() {
+    notesPickers.forEach(picker => {
+      if (!picker.listbox.hidden) closePicker(picker, false);
+      picker.options.forEach(option => {
+        option.setAttribute('aria-selected', 'false');
+        option.classList.remove('is-active');
+        option.tabIndex = -1;
+      });
+      picker.activeIndex = -1;
+      renderPicker(picker);
+    });
+  }
+
+  function saveCurrentPair() {
+    const candidate = pairFromSelections();
+    if (!candidate) {
+      notesStatus.textContent = 'Choose one item and one quantity before saving.';
+      return;
+    }
+    if (savedNotes.some(note => note.key === candidate.key && note.key !== editingKey)) {
+      notesStatus.textContent = 'That item and quantity pair is already saved.';
+      return;
+    }
+    if (editingKey) {
+      const index = savedNotes.findIndex(note => note.key === editingKey);
+      if (index >= 0) savedNotes[index] = candidate;
+      notesStatus.textContent = `Updated ${candidate.label} × ${candidate.quantityValue}.`;
+    } else {
+      savedNotes.push(candidate);
+      notesStatus.textContent = `Saved ${candidate.label} × ${candidate.quantityValue}. Choose another item and quantity to add a pair.`;
+    }
+    editingKey = null;
+    resetNotesDraft();
+    renderSavedNotes();
+  }
+
+  function setActiveOption(picker, index) {
+    if (!picker.options.length) return;
+    picker.activeIndex = (index + picker.options.length) % picker.options.length;
+    picker.options.forEach((option, i) => {
+      const active = i === picker.activeIndex;
+      option.classList.toggle('is-active', active);
+      option.tabIndex = active ? 0 : -1;
+    });
+    picker.options[picker.activeIndex].focus();
+    picker.options[picker.activeIndex].scrollIntoView({ block: 'nearest' });
+  }
+
+  function openPicker(picker) {
+    picker.listbox.hidden = false;
+    picker.button.setAttribute('aria-expanded', 'true');
+    const selectedIndex = picker.options.findIndex(option => option.getAttribute('aria-selected') === 'true');
+    setActiveOption(picker, selectedIndex >= 0 ? selectedIndex : 0);
+  }
+
+  function closePicker(picker, returnFocus) {
+    picker.listbox.hidden = true;
+    picker.button.setAttribute('aria-expanded', 'false');
+    picker.activeIndex = -1;
+    picker.options.forEach(option => {
+      option.classList.remove('is-active');
+      option.tabIndex = -1;
+    });
+    if (returnFocus) picker.button.focus();
+  }
+
+  function toggleOption(picker, option) {
+    picker.options.forEach(item => item.setAttribute('aria-selected', 'false'));
+    option.setAttribute('aria-selected', 'true');
+    renderPicker(picker);
+    const selectionType = picker === itemPicker ? 'item' : 'quantity';
+    notesStatus.textContent = `${selectionType[0].toUpperCase()}${selectionType.slice(1)} chosen. Choose one ${picker === itemPicker ? 'quantity' : 'item'}, then save the pair.`;
+    closePicker(picker, true);
+  }
+
+  notesPickers.forEach(picker => {
+    picker.button.addEventListener('click', () => {
+      if (picker.listbox.hidden) openPicker(picker);
+      else closePicker(picker, true);
+    });
+    picker.listbox.addEventListener('click', event => {
+      const option = event.target.closest('[role="option"]');
+      if (option && picker.listbox.contains(option)) {
+        option.focus();
+        toggleOption(picker, option);
+      }
+    });
+    picker.listbox.addEventListener('keydown', event => {
+      const focusedOption = event.target.closest('[role="option"]');
+      const currentIndex = focusedOption ? picker.options.indexOf(focusedOption) : picker.activeIndex;
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        setActiveOption(picker, currentIndex + (event.key === 'ArrowDown' ? 1 : -1));
+        return;
+      }
+      if (event.key === 'Home' || event.key === 'End') {
+        event.preventDefault();
+        setActiveOption(picker, event.key === 'Home' ? 0 : picker.options.length - 1);
+        return;
+      }
+      if (event.key === ' ' || event.key === 'Enter') {
+        event.preventDefault();
+        if (focusedOption) toggleOption(picker, focusedOption);
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closePicker(picker, true);
+        return;
+      }
+      if (event.key === 'Tab') {
+        window.setTimeout(() => closePicker(picker, false), 0);
+        return;
+      }
+      if (event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey && event.key.trim()) {
+        picker.typeahead += event.key.toLocaleLowerCase();
+        window.clearTimeout(picker.typeaheadTimer);
+        picker.typeaheadTimer = window.setTimeout(() => { picker.typeahead = ''; }, 700);
+        let match = picker.options.findIndex(option => option.querySelector('.notes-picker__option-main').textContent.trim().toLocaleLowerCase().startsWith(picker.typeahead));
+        if (match < 0) {
+          picker.typeahead = event.key.toLocaleLowerCase();
+          match = picker.options.findIndex(option => option.querySelector('.notes-picker__option-main').textContent.trim().toLocaleLowerCase().startsWith(picker.typeahead));
+        }
+        if (match >= 0) {
+          event.preventDefault();
+          setActiveOption(picker, match);
+        }
+      }
+    });
+  });
+
+  saveNotesButton.addEventListener('click', saveCurrentPair);
+  cancelNotesEditButton.addEventListener('click', cancelPairEdit);
+  document.addEventListener('pointerdown', event => {
+    notesPickers.forEach(picker => {
+      if (!picker.root.contains(event.target) && !picker.listbox.hidden) closePicker(picker, false);
+    });
+  });
+  notesPickers.forEach(renderPicker);
+  renderSavedNotes();
+
+  $('f').addEventListener('submit', event => {
+    event.preventDefault();
+    updateDateBoundary();
+    if (!dateInput.value || !validateDateInput()) {
+      dateInput.reportValidity();
+      return;
+    }
+    const currentSelection = notesPickers.some(picker => chosenOption(picker));
+    const currentPair = pairFromSelections();
+    const pairIsSaved = currentPair && savedNotes.some(note => note.key === currentPair.key);
+    if (editingKey || (currentSelection && !pairIsSaved)) {
+      notesStatus.textContent = 'Save the selected item and quantity pair below before requesting via WhatsApp.';
+      saveNotesButton.focus();
+      return;
+    }
+    const data = Object.fromEntries(new FormData($('f')));
+    const [year, month, day] = data.date.split('-').map(Number);
+    const requestedDate = new Intl.DateTimeFormat(undefined, {
+      year: 'numeric', month: 'long', day: 'numeric'
+    }).format(new Date(year, month - 1, day));
+    const message = [
+      'Appointment request (pending confirmation)',
+      `Name: ${data.name.trim()}`,
+      `Phone: ${data.phone.trim()}`,
+      `Email: ${data.email.trim()}`,
+      `Company: ${data.company.trim() || 'Not provided'}`,
+      `Service: ${$('service').selectedOptions[0].textContent}`,
+      `Requested date: ${requestedDate}`,
+      `Requested time: ${data.time}`,
+      `Items and quantities:\n${savedNotes.length ? savedNotes.map(note => `- ${note.label}${note.detail ? ` ${note.detail}` : ''} × ${note.quantityValue}`).join('\n') : 'None'}`
+    ].join('\n');
+
+    const whatsappUrl = 'https://wa.me/' + WHATSAPP_NUMBER + '?text=' + encodeURIComponent(message);
+    window.location.assign(whatsappUrl);
+  });
+</script>
+</body>
+</html>
